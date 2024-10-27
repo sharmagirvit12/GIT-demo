@@ -1,12 +1,7 @@
 ---
-- name: Configure target machines
-  hosts: all
-  become: yes  # Use this if you need sudo privileges
-  vars:
-    nginx_port: 80
-    server_name: localhost
-    index_file: /var/www/html/index.html
-
+- name: Install Nginx and Docker on target machines
+  hosts: target_machines
+  become: yes  # Use become if you want to run tasks as root (omit if you don't need sudo)
   tasks:
     - name: Update apt package index (Debian/Ubuntu)
       apt:
@@ -15,55 +10,77 @@
 
     - name: Update yum package index (RHEL/CentOS)
       yum:
-        name: '*'
+        update_cache: yes
+      when: ansible_os_family == "RedHat"
+
+    - name: Install required packages for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - software-properties-common
+      when: ansible_os_family == "Debian"
+
+    - name: Install required packages for Docker
+      yum:
+        name:
+          - yum-utils
+          - device-mapper-persistent-data
+          - lvm2
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/debian/gpg
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker repository
+      apt_repository:
+        repo: "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
+        state: present
+      when: ansible_os_family == "Debian"
+
+    - name: Add Docker GPG key
+      rpm_key:
+        state: present
+        key: https://download.docker.com/linux/centos/gpg
+      when: ansible_os_family == "RedHat"
+
+    - name: Add Docker repository
+      yum_repository:
+        name: docker-ce
+        description: Docker CE Stable - $basearch
+        baseurl: https://download.docker.com/linux/centos/7/x86_64/stable/
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://download.docker.com/linux/centos/gpg
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker
+      apt:
+        name: docker-ce
+        state: latest
+      when: ansible_os_family == "Debian"
+
+    - name: Install Docker
+      yum:
+        name: docker-ce
         state: latest
       when: ansible_os_family == "RedHat"
 
-    - name: Install Nginx
-      package:
-        name: nginx
-        state: present
-
-    - name: Create HTML index file
-      copy:
-        content: "<h1>Welcome to Nginx!</h1>\n<p>This is a sample page served by Nginx.</p>"
-        dest: "{{ index_file }}"
-        owner: www-data
-        group: www-data
-        mode: '0644'
-
-    - name: Ensure Nginx is started and enabled
-      systemd:
-        name: nginx
+    - name: Start and enable Docker service
+      service:
+        name: docker
         state: started
-        enabled: true
+        enabled: yes
 
-    - name: Configure Nginx to serve the index file
-      template:
-        src: nginx.conf.j2
-        dest: /etc/nginx/sites-available/default
+    - name: Verify Docker installation
+      command: docker --version
+      register: docker_version
 
-    - name: Test Nginx configuration
-      command: nginx -t
-      register: nginx_test
-      ignore_errors: yes
-
-    - name: Reload Nginx if the configuration test was successful
-      systemd:
-        name: nginx
-        state: reloaded
-      when: nginx_test.rc == 0
-
-    - name: Open firewall for Nginx (if firewalld is used)
-      firewalld:
-        service: http
-        permanent: yes
-        state: enabled
-      when: ansible_os_family == "RedHat"
-
-    - name: Open firewall for Nginx (if ufw is used)
-      ufw:
-        rule: allow
-        name: 'Nginx Full'
-      when: ansible_os_family == "Debian"
+    - name: Debug Docker version
+      debug:
+        var: docker_version.stdout
 
