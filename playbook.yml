@@ -1,20 +1,69 @@
 ---
 - name: Configure target machines
   hosts: all
-  become: yes
+  become: yes  # Use this if you need sudo privileges
+  vars:
+    nginx_port: 80
+    server_name: localhost
+    index_file: /var/www/html/index.html
+
   tasks:
-    - name: Install Nginx on the target machine
+    - name: Update apt package index (Debian/Ubuntu)
+      apt:
+        update_cache: yes
+      when: ansible_os_family == "Debian"
+
+    - name: Update yum package index (RHEL/CentOS)
+      yum:
+        name: '*'
+        state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Nginx
       package:
         name: nginx
         state: present
 
-    - name: Create a demo file
+    - name: Create HTML index file
       copy:
-        dest: /tmp/demo.txt
-        content: "This is deployed by Ansible!\n"
+        content: "<h1>Welcome to Nginx!</h1>\n<p>This is a sample page served by Nginx.</p>"
+        dest: "{{ index_file }}"
+        owner: www-data
+        group: www-data
+        mode: '0644'
 
-    - name: Start Nginx service
-      service:
+    - name: Ensure Nginx is started and enabled
+      systemd:
         name: nginx
         state: started
+        enabled: true
+
+    - name: Configure Nginx to serve the index file
+      template:
+        src: nginx.conf.j2
+        dest: /etc/nginx/sites-available/default
+
+    - name: Test Nginx configuration
+      command: nginx -t
+      register: nginx_test
+      ignore_errors: yes
+
+    - name: Reload Nginx if the configuration test was successful
+      systemd:
+        name: nginx
+        state: reloaded
+      when: nginx_test.rc == 0
+
+    - name: Open firewall for Nginx (if firewalld is used)
+      firewalld:
+        service: http
+        permanent: yes
+        state: enabled
+      when: ansible_os_family == "RedHat"
+
+    - name: Open firewall for Nginx (if ufw is used)
+      ufw:
+        rule: allow
+        name: 'Nginx Full'
+      when: ansible_os_family == "Debian"
 
