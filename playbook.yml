@@ -1,6 +1,20 @@
 ---
-- hosts: all
+- name: Configure target machines
+  hosts: all
+  become: yes
   tasks:
-    - name: Ping the target machine
-      ping:
+    - name: Install Nginx on the target machine
+      package:
+        name: nginx
+        state: present
+
+    - name: Create a demo file
+      copy:
+        dest: /tmp/demo.txt
+        content: "This is deployed by Ansible!\n"
+
+    - name: Start Nginx service
+      service:
+        name: nginx
+        state: started
 
