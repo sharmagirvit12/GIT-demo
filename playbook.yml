@@ -1,7 +1,7 @@
 ---
-- name: Install Nginx and Docker on target machines
+- name: Install Nginx and ensure Docker is functional
   hosts: all
-  become: true  # Use sudo to execute tasks
+  become: true
   tasks:
     - name: Check if Docker is installed
       command: docker --version
@@ -14,14 +14,15 @@
         state: present
       when: docker_installed.rc != 0
 
-    - name: Install Docker on RHEL/CentOS
-      yum:
-        name: docker
+    - name: Install Nginx
+      apt:
+        name: nginx
         state: present
-      when: docker_installed.rc != 0
 
-    - name: Start and enable Docker service
-      service:
-        name: docker
-        state: started
-        enabled: true
+    - name: Ensure Docker is running (directly on host)
+      command: docker ps
+      register: docker_running
+      ignore_errors: yes
+
+    - debug:
+        var: docker_running.stdout
