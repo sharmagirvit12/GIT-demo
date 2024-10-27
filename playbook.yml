@@ -1,16 +1,27 @@
-- name: Check if Docker is installed
-  command: docker --version
-  register: docker_installed
-  ignore_errors: yes
+---
+- name: Install Nginx and Docker on target machines
+  hosts: all
+  become: true  # Use sudo to execute tasks
+  tasks:
+    - name: Check if Docker is installed
+      command: docker --version
+      register: docker_installed
+      ignore_errors: yes
 
-- name: Install Docker on Debian/Ubuntu
-  apt:
-    name: docker.io
-    state: present
-  when: docker_installed.rc != 0
+    - name: Install Docker on Debian/Ubuntu
+      apt:
+        name: docker.io
+        state: present
+      when: docker_installed.rc != 0
 
-- name: Install Docker on RHEL/CentOS
-  yum:
-    name: docker
-    state: present
-  when: docker_installed.rc != 0
+    - name: Install Docker on RHEL/CentOS
+      yum:
+        name: docker
+        state: present
+      when: docker_installed.rc != 0
+
+    - name: Start and enable Docker service
+      service:
+        name: docker
+        state: started
+        enabled: true
