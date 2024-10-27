@@ -83,4 +83,3 @@
     - name: Debug Docker version
       debug:
         var: docker_version.stdout
-
