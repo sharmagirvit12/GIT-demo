@@ -1,41 +1,16 @@
----
-- name: Install Nginx and Docker on target machines
-  hosts: all
-  become: yes
-  tasks:
-    - name: Gather facts
-      setup:
+- name: Check if Docker is installed
+  command: docker --version
+  register: docker_installed
+  ignore_errors: yes
 
-    - name: Update apt package index (Debian/Ubuntu)
-      apt:
-        update_cache: yes
-      when: ansible_os_family == "Debian"
+- name: Install Docker on Debian/Ubuntu
+  apt:
+    name: docker.io
+    state: present
+  when: docker_installed.rc != 0
 
-    - name: Update yum package index (RHEL/CentOS)
-      yum:
-        name: '*'
-        state: latest
-      when: ansible_os_family == "RedHat"
-
-    - name: Check if Docker is installed
-      command: docker --version
-      register: docker_installed
-      ignore_errors: yes
-
-    - name: Install Docker on Debian/Ubuntu
-      apt:
-        name: docker.io
-        state: present
-      when: ansible_os_family == "Debian" and docker_installed.rc != 0
-
-    - name: Install Docker on RHEL/CentOS
-      yum:
-        name: docker
-        state: present
-      when: ansible_os_family == "RedHat" and docker_installed.rc != 0
-
-    - name: Start and enable Docker service
-      systemd:
-        name: docker
-        state: started
-        enabled: yes
+- name: Install Docker on RHEL/CentOS
+  yum:
+    name: docker
+    state: present
+  when: docker_installed.rc != 0
