@@ -1,8 +1,11 @@
 ---
 - name: Install Nginx and Docker on target machines
-  hosts: target_machines
-  become: yes  # Use become if you want to run tasks as root (omit if you don't need sudo)
+  hosts: all
+  become: yes
   tasks:
+    - name: Gather facts
+      setup:
+
     - name: Update apt package index (Debian/Ubuntu)
       apt:
         update_cache: yes
@@ -10,64 +13,20 @@
 
     - name: Update yum package index (RHEL/CentOS)
       yum:
-        update_cache: yes
-      when: ansible_os_family == "RedHat"
-
-    - name: Install required packages for Docker
-      apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - software-properties-common
-      when: ansible_os_family == "Debian"
-
-    - name: Install required packages for Docker
-      yum:
-        name:
-          - yum-utils
-          - device-mapper-persistent-data
-          - lvm2
-      when: ansible_os_family == "RedHat"
-
-    - name: Add Docker GPG key
-      apt_key:
-        url: https://download.docker.com/linux/debian/gpg
-        state: present
-      when: ansible_os_family == "Debian"
-
-    - name: Add Docker repository
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/debian $(lsb_release -cs) stable"
-        state: present
-      when: ansible_os_family == "Debian"
-
-    - name: Add Docker GPG key
-      rpm_key:
-        state: present
-        key: https://download.docker.com/linux/centos/gpg
-      when: ansible_os_family == "RedHat"
-
-    - name: Add Docker repository
-      yum_repository:
-        name: docker-ce
-        description: Docker CE Stable - $basearch
-        baseurl: https://download.docker.com/linux/centos/7/x86_64/stable/
-        enabled: yes
-        gpgcheck: yes
-        gpgkey: https://download.docker.com/linux/centos/gpg
-      when: ansible_os_family == "RedHat"
-
-    - name: Install Docker
-      apt:
-        name: docker-ce
+        name: '*'
         state: latest
+      when: ansible_os_family == "RedHat"
+
+    - name: Install Docker on Debian/Ubuntu
+      apt:
+        name: docker.io
+        state: present
       when: ansible_os_family == "Debian"
 
-    - name: Install Docker
+    - name: Install Docker on RHEL/CentOS
       yum:
-        name: docker-ce
-        state: latest
+        name: docker
+        state: present
       when: ansible_os_family == "RedHat"
 
     - name: Start and enable Docker service
@@ -75,11 +34,3 @@
         name: docker
         state: started
         enabled: yes
-
-    - name: Verify Docker installation
-      command: docker --version
-      register: docker_version
-
-    - name: Debug Docker version
-      debug:
-        var: docker_version.stdout
